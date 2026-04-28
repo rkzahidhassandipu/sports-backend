@@ -1,0 +1,491 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  COACH
+  TRAINER
+  RECEPTIONIST
+  MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  SCHEDULED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  STRIPE
+  CASH
+  BANK_TRANSFER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ReportType {
+  FINANCE
+  ACTIVITY
+  PERFORMANCE
+  MEMBERSHIP
+}
+
+// ─────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id                       String     @id @default(cuid())
+  name                     String
+  email                    String     @unique
+  emailVerified            Boolean    @default(false)
+  emailVerifiedAt          DateTime?
+  password                 String
+  avatar                   String?
+  phone                    String?
+  bio                      String?
+  role                     Role       @default(MEMBER)
+  status                   UserStatus @default(ACTIVE)
+  lastLoginAt              DateTime?
+  passwordResetToken       String?
+  passwordResetTokenExpiry DateTime?
+  emailVerificationToken   String?
+  refreshToken             String?    @unique
+  refreshTokenExpiry       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  profile         UserProfile?
+  sessions        Session[]             @relation("CoachSessions")
+  bookings        Booking[]
+  payments        Payment[]
+  reviews         Review[]
+  notifications   Notification[]
+  activityLogs    ActivityLog[]
+  supportTickets  SupportTicket[]
+  blogPosts       BlogPost[]
+  auditLogs       AuditLog[]
+  fitnessRecords  FitnessRecord[]       @relation("MemberRecords")
+  trainedRecords  FitnessRecord[]       @relation("TrainerRecords")
+  socialAccounts  SocialAccount[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  address     String?
+  city        String?
+  country     String?
+  dateOfBirth DateTime?
+  gender      String?
+  emergencyContact String?
+  membershipExpiry DateTime?
+  specializations  String[]
+  certifications   String[]
+  socialLinks Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model SocialAccount {
+  id                String    @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("social_accounts")
+}
+
+// ─────────────────────────────────────────────
+// SESSIONS (Gym Training Sessions)
+// ─────────────────────────────────────────────
+
+model Session {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  coachId     String
+  date        DateTime
+  startTime   String
+  endTime     String
+  duration    Int           // in minutes
+  capacity    Int           @default(10)
+  location    String?
+  price       Decimal       @db.Decimal(10, 2)
+  status      SessionStatus @default(SCHEDULED)
+  category    String?
+  level       String?       // Beginner, Intermediate, Advanced
+  equipment   String[]
+  coverImage  String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coach    User      @relation("CoachSessions", fields: [coachId], references: [id])
+  bookings Booking[]
+  reviews  Review[]
+
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────
+// BOOKINGS
+// ─────────────────────────────────────────────
+
+model Booking {
+  id            String        @id @default(cuid())
+  userId        String
+  sessionId     String
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  totalAmount   Decimal       @default(0) @db.Decimal(10, 2)
+  notes         String?
+  cancelledAt   DateTime?
+  cancelReason  String?
+  confirmedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  session  Session   @relation(fields: [sessionId], references: [id])
+  payments Payment[]
+
+  @@unique([userId, sessionId])
+  @@map("bookings")
+}
+
+// ─────────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(cuid())
+  bookingId         String?
+  userId            String
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("USD")
+  method            PaymentMethod @default(STRIPE)
+  status            PaymentStatus @default(PENDING)
+  stripePaymentId   String?       @unique
+  stripeSessionId   String?       @unique
+  invoiceUrl        String?
+  invoiceNumber     String?       @unique
+  description       String?
+  refundId          String?
+  refundAmount      Decimal?      @db.Decimal(10, 2)
+  paidAt            DateTime?
+  metadata          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────
+// FITNESS RECORDS
+// ─────────────────────────────────────────────
+
+model FitnessRecord {
+  id         String   @id @default(cuid())
+  memberId   String
+  trainerId  String?
+  recordType String   // e.g. "body_composition", "strength", "cardio", "flexibility"
+  date       DateTime @default(now())
+  data       Json     // flexible record data
+  notes      String?
+  weight     Decimal? @db.Decimal(5, 2)
+  height     Decimal? @db.Decimal(5, 2)
+  bmi        Decimal? @db.Decimal(4, 2)
+  bodyFat    Decimal? @db.Decimal(4, 2)
+  goals      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member  User  @relation("MemberRecords",  fields: [memberId],  references: [id])
+  trainer User? @relation("TrainerRecords", fields: [trainerId], references: [id])
+
+  @@map("fitness_records")
+}
+
+// ─────────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────────
+
+model Review {
+  id        String  @id @default(cuid())
+  userId    String
+  sessionId String
+  rating    Int     // 1-5
+  comment   String?
+  isHidden  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id])
+
+  @@unique([userId, sessionId])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id       String  @id @default(cuid())
+  userId   String
+  title    String
+  message  String
+  type     String
+  isRead   Boolean  @default(false)
+  readAt   DateTime?
+  link     String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// BLOG
+// ─────────────────────────────────────────────
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String
+  coverImage  String?
+  authorId    String
+  published   Boolean  @default(false)
+  publishedAt DateTime?
+  tags        String[]
+  viewCount   Int      @default(0)
+  readTime    Int?     // minutes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("blog_posts")
+}
+
+// ─────────────────────────────────────────────
+// SUPPORT TICKETS
+// ─────────────────────────────────────────────
+
+model SupportTicket {
+  id         String         @id @default(cuid())
+  userId     String
+  subject    String
+  message    String
+  status     TicketStatus   @default(OPEN)
+  priority   TicketPriority @default(MEDIUM)
+  assignedTo String?
+  resolvedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id])
+  replies TicketReply[]
+
+  @@map("support_tickets")
+}
+
+model TicketReply {
+  id       String @id @default(cuid())
+  ticketId String
+  senderId String
+  message  String
+  isStaff  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_replies")
+}
+
+// ─────────────────────────────────────────────
+// NEWSLETTER
+// ─────────────────────────────────────────────
+
+model NewsletterSubscriber {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  isActive    Boolean  @default(true)
+  confirmedAt DateTime?
+  token       String?
+
+  createdAt DateTime @default(now())
+
+  @@map("newsletter_subscribers")
+}
+
+// ─────────────────────────────────────────────
+// CONTACT FORM
+// ─────────────────────────────────────────────
+
+model ContactForm {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  repliedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("contact_forms")
+}
+
+// ─────────────────────────────────────────────
+// STATIC CONTENT (Privacy, Terms)
+// ─────────────────────────────────────────────
+
+model StaticContent {
+  id       String  @id @default(cuid())
+  key      String  @unique
+  title    String
+  content  String
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("static_contents")
+}
+
+// ─────────────────────────────────────────────
+// REPORTS
+// ─────────────────────────────────────────────
+
+model Report {
+  id          String     @id @default(cuid())
+  type        ReportType
+  title       String
+  data        Json
+  period      String?
+  generatedBy String?
+
+  createdAt DateTime @default(now())
+
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT & ACTIVITY LOGS
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String  @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model ActivityLog {
+  id          String @id @default(cuid())
+  userId      String
+  description String
+  type        String
+  ipAddress   String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
