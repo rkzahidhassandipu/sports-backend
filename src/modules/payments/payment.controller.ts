@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { asyncHandler, ApiResponse } from "../../utils/ApiResponse";
 import { getPagination } from "../../utils/pagination";
 import * as svc from "./payment.service";
+import { AppError } from "@/utils/AppError";
 
 export const getMyPayments = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
@@ -33,4 +34,10 @@ export const downloadInvoice = asyncHandler(async (req: Request, res: Response) 
   const id = req.params.id as string;
   const invoice = await svc.generateInvoiceData(id, req.user!.id);
   ApiResponse.success(res, invoice, "Invoice data");
+});
+export const createCheckoutSession = asyncHandler(async (req: Request, res: Response) => {
+  const { bookingId } = req.body;
+  if (!bookingId) throw AppError.badRequest("bookingId is required");
+  const result = await svc.createCheckoutSession(bookingId, req.user!.id);
+  ApiResponse.success(res, result, "Checkout session created");
 });

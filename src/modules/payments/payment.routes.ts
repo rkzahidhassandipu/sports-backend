@@ -12,5 +12,7 @@ router.get("/",            isAdmin, ctrl.getAllPayments);
 router.get("/:id",         ctrl.getPayment);
 router.post("/:id/refund", isAdmin, ctrl.refundPayment);
 router.get("/stats/summary", isAdmin, ctrl.getPaymentStats);
+router.post("/create-checkout-session", ctrl.createCheckoutSession);
+
 
 export default router;

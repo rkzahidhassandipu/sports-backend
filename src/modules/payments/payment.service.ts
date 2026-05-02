@@ -1,7 +1,7 @@
 // src/modules/payments/payment.service.ts
 import { prisma } from "../../config/database";
 import { AppError } from "../../utils/AppError";
-import { createRefund } from "../../config/stripe";
+import { createRefund, stripe } from "../../config/stripe";
 
 const PAYMENT_INCLUDE = {
   booking: {
@@ -93,6 +93,49 @@ export async function refundPayment(id: string, amount?: number) {
   return updated;
 }
 
+
+export async function createCheckoutSession(bookingId: string, userId: string) {
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, userId },
+    include: { session: true },
+  });
+  if (!booking) throw AppError.notFound("Booking not found");
+
+  const price = Number(booking.session.price);
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        unit_amount: Math.round(price * 100), // cents
+        product_data: {
+          name: booking.session.title,
+        },
+      },
+      quantity: 1,
+    }],
+    metadata: { bookingId, userId },
+    success_url: `${process.env.CLIENT_URL}/booking/success?bookingId=${bookingId}`,
+    cancel_url:  `${process.env.CLIENT_URL}/booking/cancel?bookingId=${bookingId}`,
+  });
+
+  // Payment record create করো
+  await prisma.payment.create({
+    data: {
+      userId,
+      bookingId,
+      amount:          price,
+      currency:        "USD",
+      method:          "STRIPE",
+      status:          "PENDING",
+      stripePaymentId: checkoutSession.payment_intent as string,
+    },
+  });
+
+  return { url: checkoutSession.url };
+}
 export async function getPaymentStats() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
