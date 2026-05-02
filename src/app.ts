@@ -31,9 +31,11 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: (process.env.CLIENT_URL || "http://localhost:3000").split(","),
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  origin: [
+    "https://sports-club-self.vercel.app",
+    "http://localhost:3000"
+  ],
+  credentials: true
 }));
 
 // Stripe webhook needs raw body — mount BEFORE json middleware

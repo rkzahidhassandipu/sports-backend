@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 
 const APP  = process.env.APP_NAME || "Gym App";
 const FROM = process.env.SMTP_FROM || `noreply@gymapp.com`;
-const CLIENT = process.env.CLIENT_URL || "http://localhost:3000";
+const CLIENT = process.env.CLIENT_URL || "https://sports-club-self.vercel.app";
 
 const base = (body: string) => `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>

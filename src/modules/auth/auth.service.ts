@@ -11,8 +11,8 @@ import { audit, activity } from "../../lib/audit";
 const SECRET   = process.env.JWT_SECRET!;
 const EXP      = process.env.JWT_EXPIRES_IN || "15m";
 const REXP     = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
-const APP_URL  = process.env.APP_URL || "http://localhost:5000";
-const CLI_URL  = process.env.CLIENT_URL || "http://localhost:3000";
+const APP_URL  = process.env.APP_URL || "https://sports-plus-backend.vercel.app";
+const CLI_URL  = process.env.CLIENT_URL || "https://sports-club-self.vercel.app";
 
 const SAFE = {
   id: true, name: true, email: true, emailVerified: true,

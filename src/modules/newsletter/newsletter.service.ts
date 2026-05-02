@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { prisma } from "../../config/database";
 import { emailService } from "../../lib/email";
 
-const APP_URL = process.env.APP_URL || "http://localhost:5000";
+const APP_URL = process.env.APP_URL || "https://sports-plus-backend.vercel.app";
 
 export async function subscribe(email: string, name?: string) {
   const token = crypto.randomBytes(32).toString("hex");
