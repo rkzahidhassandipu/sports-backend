@@ -319,7 +319,3 @@ SMTP_USER=your@email.com
 
 ## 📝 License
 
-MIT
-#   s p o r t s - f o r n t e n d  
- #   s p o r t s - b a c k e n d  
- 
